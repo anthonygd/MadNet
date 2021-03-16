@@ -13,7 +13,7 @@ import (
 // Manager interfaces and structs
 // ========================================================
 
-// Manager describtes the basic functionality of a task Manager
+// Manager describes the basic functionality of a task Manager
 type Manager interface {
 	NewTaskHandler(timeout time.Duration, retryDelay time.Duration, t Task) TaskHandler
 	WaitForTasks()
@@ -39,7 +39,7 @@ func (md *ManagerDetails) NewTaskHandler(
 
 	md.logger.Infof("Creating task %v with timeout of %v and retryDelay of %v", taskID, timeout, retryDelay)
 
-	return &TaskHandlerDetails{
+	details := &TaskHandlerDetails{
 		ID:          taskID,
 		doWork:      task.DoWork,
 		doRetry:     task.DoRetry,
@@ -50,6 +50,8 @@ func (md *ManagerDetails) NewTaskHandler(
 		timeout:     timeout,
 		retryDelay:  retryDelay,
 	}
+
+	return details
 }
 
 // WaitForTasks blocks until all tasks associated withis Manager have completed

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"os"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/MadBase/MadNet/config"
 	"github.com/MadBase/MadNet/logging"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -62,6 +64,13 @@ var TransferTokensCommand = cobra.Command{
 var UnregisterCommand = cobra.Command{
 	Use:   "unregister",
 	Short: "Removes the default account from the validator pool",
+	Long:  "",
+	Run:   utilsNode}
+
+// DumpMigrationsCommand is the command the requests the caller is removed from validator pool
+var DumpMigrationsCommand = cobra.Command{
+	Use:   "dumpMigrations",
+	Short: "",
 	Long:  "",
 	Run:   utilsNode}
 
@@ -228,12 +237,91 @@ func utilsNode(cmd *cobra.Command, args []string) {
 		exitCode = transfertokens(logger, eth, cmd, args)
 	case "deposit":
 		exitCode = deposittokens(logger, eth, cmd, args)
+	case "dumpMigrations":
+		exitCode = dumpMigrations(logger, eth, cmd, args)
 	default:
 		logger.Errorf("Could not find handler for %v", cmd.Use)
 		exitCode = 1
 	}
 
 	os.Exit(exitCode)
+}
+
+func depositReceived(log types.Log) {
+	fmt.Printf("deposit received")
+}
+
+func snapshotTaken(log types.Log) {
+	fmt.Printf("snapshotTaken")
+}
+
+func validatorJoinedReceived(log types.Log) {
+	fmt.Printf("validatorJoinedReceived")
+}
+
+func validatorSetReceived(log types.Log) {
+	fmt.Printf("validatorSetReceived")
+
+}
+
+func validatorMemberReceived(log types.Log) {
+	fmt.Printf("validatorMemberReceived")
+}
+
+func dumpMigrations(logger *logrus.Logger, eth blockchain.Ethereum, cmd *cobra.Command, args []string) int {
+
+	eventMap := make(map[string]func(types.Log))
+	eventMap["0x5b063c6569a91e8133fc6cd71d31a4ca5c65c652fd53ae093f46107754f08541"] = depositReceived         // , "DepositReceived", svcs.ProcessDepositReceived); err != nil {
+	eventMap["0x113b129fac2dde341b9fbbec2bb79a95b9945b0e80fda711fc8ae5c7b0ea83b0"] = validatorMemberReceived // (log types.Log), "ValidatorMember", svcs.ProcessValidatorMember); err != nil {
+	eventMap["0x1c85ff1efe0a905f8feca811e617102cb7ec896aded693eb96366c8ef22bb09f"] = validatorSetReceived
+	eventMap["0x8c25e214c5693ebaf8008875bacedeb9e0aafd393864a314ed1801b2a4e13dd9"] = validatorJoinedReceived
+	eventMap["0x6d438b6b835d16cdae6efdc0259fdfba17e6aa32dae81863a2467866f85f724a"] = snapshotTaken
+
+	// if err := svcs.RegisterEvent("0x1c85ff1efe0a905f8feca811e617102cb7ec896aded693eb96366c8ef22bb09f", "ValidatorSet", svcs.ProcessValidatorSet); err != nil {
+	// 	panic(err)
+	// }
+	// if err := svcs.RegisterEvent("0x6d438b6b835d16cdae6efdc0259fdfba17e6aa32dae81863a2467866f85f724a", "SnapshotTaken", svcs.ProcessSnapshotTaken); err != nil {
+	// 	panic(err)
+	// }
+	// if err := svcs.RegisterEvent("0xa84d294194d6169652a99150fd2ef10e18b0d2caa10beeea237bbddcc6e22b10", "ShareDistribution", svcs.ProcessShareDistribution); err != nil {
+	// 	panic(err)
+	// }
+	// if err := svcs.RegisterEvent("0xb0ee36c3780de716eb6c83687f433ae2558a6923e090fd238b657fb6c896badc", "KeyShareSubmission", svcs.ProcessKeyShareSubmission); err != nil {
+	// 	panic(err)
+	// }
+	// if err := svcs.RegisterEvent("0x9c6f8368fe7e77e8cb9438744581403bcb3f53298e517f04c1b8475487402e97", "RegistrationOpen", svcs.ProcessRegistrationOpen); err != nil {
+	// 	panic(err)
+	// }
+
+	ctx := context.Background()
+	c := eth.Contracts()
+	contractAddresses := []common.Address{
+		c.DepositAddress, c.EthdkgAddress, c.RegistryAddress,
+		c.StakingTokenAddress, c.UtilityTokenAddress, c.ValidatorsAddress}
+
+	startingBlock := config.Configuration.Ethereum.StartingBlock
+	endingBlock, err := eth.GetCurrentHeight(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	logs, err := eth.GetEvents(ctx, uint64(startingBlock), endingBlock, contractAddresses)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, log := range logs {
+		eventSelector := log.Topics[0].String()
+
+		process, ok := eventMap[eventSelector]
+		if ok {
+			process(log)
+		} else {
+			logger.Infof("No handler for %v", eventSelector)
+		}
+	}
+
+	return 0
 }
 
 func register(logger *logrus.Logger, eth blockchain.Ethereum, cmd *cobra.Command, args []string) int {

@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -75,6 +76,11 @@ func deployNode(cmd *cobra.Command, args []string) {
 			if err != nil {
 				logger.Error(err)
 			}
+		}
+
+		csvName := config.Configuration.Deploy.MigrationCSV
+		if len(csvName) > 0 {
+			fmt.Printf("foo:%v", csvName)
 		}
 	}
 

@@ -68,6 +68,7 @@ type transportConfig struct {
 type deployConfig struct {
 	Migrations     bool
 	TestMigrations bool
+	MigrationCSV   string
 }
 
 type utilsConfig struct {

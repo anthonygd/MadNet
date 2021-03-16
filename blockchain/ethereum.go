@@ -1270,11 +1270,13 @@ func (u *Updater) Add(signature string, facet common.Address) *types.Transaction
 	}
 
 	selector := CalculateSelector(signature)
-	if u.Logger != nil {
-		u.Logger.Infof("Registering %v as %x with %v", signature, selector, facet.Hex())
-	}
 
 	txn, err := u.Updater.AddFacet(u.TxnOpts, selector, facet)
 	u.err = err
+
+	if u.Logger != nil {
+		u.Logger.Infof("Registering %v as %x with %v. Gas %v.", signature, selector, facet.Hex(), txn.Gas())
+	}
+
 	return txn
 }

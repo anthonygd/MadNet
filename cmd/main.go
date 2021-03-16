@@ -124,6 +124,7 @@ func main() {
 		&utils.TransferTokensCommand: {},
 		&utils.UnregisterCommand:     {},
 		&utils.DepositCommand:        {},
+		&utils.DumpMigrationsCommand: {},
 
 		&bootnode.Command: {
 			{"bootnode.listeningAddress", "", "", &config.Configuration.BootNode.ListeningAddress},
@@ -136,6 +137,7 @@ func main() {
 
 		&deploy.Command: {
 			{"deploy.migrations", "", "", &config.Configuration.Deploy.Migrations},
+			{"deploy.migrationCSV", "", "", &config.Configuration.Deploy.MigrationCSV},
 			{"deploy.testMigrations", "", "", &config.Configuration.Deploy.TestMigrations}},
 	}
 
