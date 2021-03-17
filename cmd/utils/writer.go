@@ -38,7 +38,13 @@ func OpenFileAsWriter(path string) (w *bufio.Writer, close func() error, err err
 	if err != nil {
 		return nil, nil, err
 	}
-	close = file.Close
 	w = bufio.NewWriter(file)
+	close = func() error {
+		defer file.Close()
+		if err := w.Flush(); err != nil {
+			return err
+		}
+		return nil
+	}
 	return w, close, nil
 }

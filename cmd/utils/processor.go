@@ -58,8 +58,9 @@ type Processor struct {
 	deposits        map[uint32][]*DirectDeposit
 }
 
-// ValidatorJoined handles KeyShareSubmission events
+// ValidatorJoined handles ValidatorJoined events
 func (p *Processor) ValidatorJoined(ebn uint64, l types.Log) error {
+	p.logger.Infof("Found ValidatorJoined on block %v", ebn)
 	event, err := p.c.Validators.ParseValidatorJoined(l)
 	if err != nil {
 		p.logger.Errorf("validator joined: %v", err)
@@ -71,6 +72,7 @@ func (p *Processor) ValidatorJoined(ebn uint64, l types.Log) error {
 
 // ValidatorSet handles ValidatorSet events
 func (p *Processor) ValidatorSet(ebn uint64, l types.Log) error {
+	p.logger.Infof("Found ValidatorSet on block %v", ebn)
 	event, err := p.c.Ethdkg.ParseValidatorSet(l)
 	if err != nil {
 		p.logger.Errorf("validator set: %v", err)
@@ -135,6 +137,7 @@ func (p *Processor) ValidatorSet(ebn uint64, l types.Log) error {
 
 // Deposit handles Deposit events
 func (p *Processor) Deposit(ebn uint64, l types.Log) error {
+	p.logger.Infof("Found Deposit on block %v", ebn)
 	if p.deposits[p.epoch] == nil {
 		p.deposits[p.epoch] = []*DirectDeposit{}
 	}
@@ -154,6 +157,7 @@ func (p *Processor) Deposit(ebn uint64, l types.Log) error {
 
 // Snapshot handles Snapshot events
 func (p *Processor) Snapshot(ebn uint64, l types.Log) error {
+	p.logger.Infof("Found Snapshot on block %v", ebn)
 	event, err := p.c.Validators.ParseSnapshotTaken(l)
 	if err != nil {
 		p.logger.Errorf("snapshot: %v", err)
