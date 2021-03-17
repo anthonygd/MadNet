@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"os"
 	"strings"
@@ -69,10 +68,17 @@ var UnregisterCommand = cobra.Command{
 	Long:  "",
 	Run:   utilsNode}
 
-// DumpMigrationsCommand is the command the requests the caller is removed from validator pool
+// DumpMigrationsCommand
 var DumpMigrationsCommand = cobra.Command{
 	Use:   "dumpMigrations",
 	Short: "Dumps file required for migrating contract data",
+	Long:  "",
+	Run:   utilsNode}
+
+// ProcessMigrationsCommand
+var ProcessMigrationsCommand = cobra.Command{
+	Use:   "processMigrations",
+	Short: "Loads a migration file required for migrating contract data",
 	Long:  "",
 	Run:   utilsNode}
 
@@ -220,7 +226,6 @@ func utilsNode(cmd *cobra.Command, args []string) {
 		logger.Errorf("Can not unlock account %v: %v", acct.Address.Hex(), err)
 	}
 
-	logger.Errorf("Looking for handle for %v", cmd.Use)
 	// Route command
 	var exitCode int
 	switch cmd.Use {
@@ -242,6 +247,8 @@ func utilsNode(cmd *cobra.Command, args []string) {
 		exitCode = deposittokens(logger, eth, cmd, args)
 	case "dumpMigrations":
 		exitCode = dumpMigrations(logger, eth, cmd, args)
+	case "processMigrations":
+		exitCode = processMigrations(logger, eth, cmd, args)
 	default:
 		logger.Errorf("Could not find handler for %v", cmd.Use)
 		exitCode = 1
@@ -250,29 +257,40 @@ func utilsNode(cmd *cobra.Command, args []string) {
 	os.Exit(exitCode)
 }
 
-func depositReceived(_ uint64, log types.Log) error {
-	fmt.Printf("deposit received")
-	return nil
-}
+func processMigrations(logger *logrus.Logger, eth blockchain.Ethereum, cmd *cobra.Command, args []string) int {
 
-func snapshotTaken(_ uint64, log types.Log) error {
-	fmt.Printf("snapshotTaken")
-	return nil
-}
+	if len(args) < 2 {
+		logger.Errorf("Usage: processMigrations {input migrations file} {output audit file}")
+		return 1
+	}
 
-func validatorJoinedReceived(_ uint64, log types.Log) error {
-	fmt.Printf("validatorJoinedReceived")
-	return nil
-}
+	reader, closeReader, err := OpenFileAsReader(args[0])
+	if err != nil {
+		logger.Errorf("Reader: %v", err)
+		return 1
+	}
+	defer closeReader()
 
-func validatorSetReceived(_ uint64, log types.Log) error {
-	fmt.Printf("validatorSetReceived")
-	return nil
-}
+	writer, closeWriter, err := OpenFileAsWriter(args[1])
+	if err != nil {
+		logger.Errorf("Writer: %v", err)
+		return 1
+	}
+	defer closeWriter()
 
-func validatorMemberReceived(_ uint64, log types.Log) error {
-	fmt.Printf("validatorMemberReceived")
-	return nil
+	m, err := NewMigrator(eth, &Reader{Reader: reader}, &Writer{Writer: writer})
+	if err != nil {
+		logger.Errorf("new migrator: %v", err)
+		return 1
+	}
+
+	err = m.Migrate()
+	if err != nil {
+		logger.Errorf("migrate: %v", err)
+		return 1
+	}
+
+	return 0
 }
 
 func dumpMigrations(logger *logrus.Logger, eth blockchain.Ethereum, cmd *cobra.Command, args []string) int {
@@ -321,25 +339,26 @@ func dumpMigrations(logger *logrus.Logger, eth blockchain.Ethereum, cmd *cobra.C
 		return 1
 	}
 
-	for i := startingBlock; i < endingBlock; i++ {
-		logs, err := eth.GetEvents(ctx, i, i+1, contractAddresses)
-		if err != nil {
-			logger.Error(err)
-			return 1
-		}
-		for _, log := range logs {
-			eventSelector := log.Topics[0].String()
-			process, ok := eventMap[eventSelector]
-			if ok {
-				if err := process(i, log); err != nil {
-					logger.Error(err)
-					return 1
-				}
-			} else {
-				logger.Infof("No handler for %v", eventSelector)
+	// for i := startingBlock; i < endingBlock; i++ {
+	logs, err := eth.GetEvents(ctx, startingBlock, endingBlock, contractAddresses)
+	if err != nil {
+		logger.Error(err)
+		return 1
+	}
+	for _, log := range logs {
+		eventSelector := log.Topics[0].String()
+		process, ok := eventMap[eventSelector]
+		if ok {
+			logger.Infof("Found handler for block % event %v", log.BlockNumber, eventSelector)
+			if err := process(log.BlockNumber, log); err != nil {
+				logger.Error(err)
+				return 1
 			}
+		} else {
+			logger.Infof("No handler for %v", eventSelector)
 		}
 	}
+	// }
 	if err := p.Finalize(); err != nil {
 		logger.Error(err)
 		return 1

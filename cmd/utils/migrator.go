@@ -12,8 +12,49 @@ import (
 )
 
 // NewMigrator returns a configured migrator
-func NewMigrator() (*Migrator, error) {
-	panic("not implemented")
+func NewMigrator(eth blockchain.Ethereum, r *Reader, w *Writer) (*Migrator, error) {
+
+	ctx := context.Background()
+	txnOpts, err := eth.GetTransactionOpts(ctx, eth.GetDefaultAccount())
+
+	m := &Migrator{
+		eth:    eth,
+		txOpts: txnOpts,
+		r:      r,
+		w:      w,
+	}
+
+	c := eth.Contracts()
+	client := eth.GetGethClient()
+
+	m.staking, err = bindings.NewMigrateStakingFacet(c.ValidatorsAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	m.validators, err = bindings.NewMigrateParticipantsFacet(c.ValidatorsAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	m.deposit = c.Deposit
+
+	m.snapshots, err = bindings.NewMigrateSnapshotsFacet(c.ValidatorsAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	m.epoch, err = bindings.NewSnapshotsFacet(c.ValidatorsAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	m.dkg, err = bindings.NewMigrateETHDKG(c.EthdkgAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 // Migrator performs a migration

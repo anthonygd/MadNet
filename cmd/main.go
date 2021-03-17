@@ -117,14 +117,15 @@ func main() {
 		&utils.Command: {
 			{"utils.status", "", "", &config.Configuration.Utils.Status}},
 
-		&utils.ApproveTokensCommand:  {},
-		&utils.EthdkgCommand:         {},
-		&utils.RegisterCommand:       {},
-		&utils.SendWeiCommand:        {},
-		&utils.TransferTokensCommand: {},
-		&utils.UnregisterCommand:     {},
-		&utils.DepositCommand:        {},
-		&utils.DumpMigrationsCommand: {},
+		&utils.ApproveTokensCommand:     {},
+		&utils.EthdkgCommand:            {},
+		&utils.RegisterCommand:          {},
+		&utils.SendWeiCommand:           {},
+		&utils.TransferTokensCommand:    {},
+		&utils.UnregisterCommand:        {},
+		&utils.DepositCommand:           {},
+		&utils.DumpMigrationsCommand:    {},
+		&utils.ProcessMigrationsCommand: {},
 
 		&bootnode.Command: {
 			{"bootnode.listeningAddress", "", "", &config.Configuration.BootNode.ListeningAddress},
@@ -143,18 +144,19 @@ func main() {
 
 	// Establish command hierarchy
 	hierarchy := map[*cobra.Command]*cobra.Command{
-		&bootnode.Command:            &rootCommand,
-		&validator.Command:           &rootCommand,
-		&deploy.Command:              &rootCommand,
-		&utils.Command:               &rootCommand,
-		&utils.ApproveTokensCommand:  &utils.Command,
-		&utils.EthdkgCommand:         &utils.Command,
-		&utils.RegisterCommand:       &utils.Command,
-		&utils.SendWeiCommand:        &utils.Command,
-		&utils.TransferTokensCommand: &utils.Command,
-		&utils.UnregisterCommand:     &utils.Command,
-		&utils.DepositCommand:        &utils.Command,
-		&utils.DumpMigrationsCommand: &utils.Command}
+		&bootnode.Command:               &rootCommand,
+		&validator.Command:              &rootCommand,
+		&deploy.Command:                 &rootCommand,
+		&utils.Command:                  &rootCommand,
+		&utils.ApproveTokensCommand:     &utils.Command,
+		&utils.EthdkgCommand:            &utils.Command,
+		&utils.RegisterCommand:          &utils.Command,
+		&utils.SendWeiCommand:           &utils.Command,
+		&utils.TransferTokensCommand:    &utils.Command,
+		&utils.UnregisterCommand:        &utils.Command,
+		&utils.DepositCommand:           &utils.Command,
+		&utils.DumpMigrationsCommand:    &utils.Command,
+		&utils.ProcessMigrationsCommand: &utils.Command}
 
 	// Convert option abstraction into concrete settings for Cobra and Viper
 	for c := range options {
