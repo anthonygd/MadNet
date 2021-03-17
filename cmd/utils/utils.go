@@ -10,7 +10,9 @@ import (
 
 	"github.com/MadBase/MadNet/blockchain"
 	"github.com/MadBase/MadNet/config"
+	"github.com/MadBase/MadNet/consensus/db"
 	"github.com/MadBase/MadNet/logging"
+	mnutils "github.com/MadBase/MadNet/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -70,7 +72,7 @@ var UnregisterCommand = cobra.Command{
 // DumpMigrationsCommand is the command the requests the caller is removed from validator pool
 var DumpMigrationsCommand = cobra.Command{
 	Use:   "dumpMigrations",
-	Short: "",
+	Short: "Dumps file required for migrating contract data",
 	Long:  "",
 	Run:   utilsNode}
 
@@ -218,6 +220,7 @@ func utilsNode(cmd *cobra.Command, args []string) {
 		logger.Errorf("Can not unlock account %v: %v", acct.Address.Hex(), err)
 	}
 
+	logger.Errorf("Looking for handle for %v", cmd.Use)
 	// Route command
 	var exitCode int
 	switch cmd.Use {
@@ -247,80 +250,100 @@ func utilsNode(cmd *cobra.Command, args []string) {
 	os.Exit(exitCode)
 }
 
-func depositReceived(log types.Log) {
+func depositReceived(_ uint64, log types.Log) error {
 	fmt.Printf("deposit received")
+	return nil
 }
 
-func snapshotTaken(log types.Log) {
+func snapshotTaken(_ uint64, log types.Log) error {
 	fmt.Printf("snapshotTaken")
+	return nil
 }
 
-func validatorJoinedReceived(log types.Log) {
+func validatorJoinedReceived(_ uint64, log types.Log) error {
 	fmt.Printf("validatorJoinedReceived")
+	return nil
 }
 
-func validatorSetReceived(log types.Log) {
+func validatorSetReceived(_ uint64, log types.Log) error {
 	fmt.Printf("validatorSetReceived")
-
+	return nil
 }
 
-func validatorMemberReceived(log types.Log) {
+func validatorMemberReceived(_ uint64, log types.Log) error {
 	fmt.Printf("validatorMemberReceived")
+	return nil
 }
 
 func dumpMigrations(logger *logrus.Logger, eth blockchain.Ethereum, cmd *cobra.Command, args []string) int {
+	pctx := context.Background()
+	ctx, cf := context.WithCancel(pctx)
+	defer cf()
 
-	eventMap := make(map[string]func(types.Log))
-	eventMap["0x5b063c6569a91e8133fc6cd71d31a4ca5c65c652fd53ae093f46107754f08541"] = depositReceived         // , "DepositReceived", svcs.ProcessDepositReceived); err != nil {
-	eventMap["0x113b129fac2dde341b9fbbec2bb79a95b9945b0e80fda711fc8ae5c7b0ea83b0"] = validatorMemberReceived // (log types.Log), "ValidatorMember", svcs.ProcessValidatorMember); err != nil {
-	eventMap["0x1c85ff1efe0a905f8feca811e617102cb7ec896aded693eb96366c8ef22bb09f"] = validatorSetReceived
-	eventMap["0x8c25e214c5693ebaf8008875bacedeb9e0aafd393864a314ed1801b2a4e13dd9"] = validatorJoinedReceived
-	eventMap["0x6d438b6b835d16cdae6efdc0259fdfba17e6aa32dae81863a2467866f85f724a"] = snapshotTaken
+	dbPath := config.Configuration.Chain.StateDbPath
+	stateDb, err := mnutils.OpenBadger(ctx.Done(), dbPath, false)
+	if err != nil {
+		logger.Error(err)
+		return 1
+	}
+	defer stateDb.Close()
 
-	// if err := svcs.RegisterEvent("0x1c85ff1efe0a905f8feca811e617102cb7ec896aded693eb96366c8ef22bb09f", "ValidatorSet", svcs.ProcessValidatorSet); err != nil {
-	// 	panic(err)
-	// }
-	// if err := svcs.RegisterEvent("0x6d438b6b835d16cdae6efdc0259fdfba17e6aa32dae81863a2467866f85f724a", "SnapshotTaken", svcs.ProcessSnapshotTaken); err != nil {
-	// 	panic(err)
-	// }
-	// if err := svcs.RegisterEvent("0xa84d294194d6169652a99150fd2ef10e18b0d2caa10beeea237bbddcc6e22b10", "ShareDistribution", svcs.ProcessShareDistribution); err != nil {
-	// 	panic(err)
-	// }
-	// if err := svcs.RegisterEvent("0xb0ee36c3780de716eb6c83687f433ae2558a6923e090fd238b657fb6c896badc", "KeyShareSubmission", svcs.ProcessKeyShareSubmission); err != nil {
-	// 	panic(err)
-	// }
-	// if err := svcs.RegisterEvent("0x9c6f8368fe7e77e8cb9438744581403bcb3f53298e517f04c1b8475487402e97", "RegistrationOpen", svcs.ProcessRegistrationOpen); err != nil {
-	// 	panic(err)
-	// }
+	d := &db.Database{}
+	if err := d.Init(stateDb); err != nil {
+		panic(err)
+	}
 
-	ctx := context.Background()
 	c := eth.Contracts()
 	contractAddresses := []common.Address{
 		c.DepositAddress, c.EthdkgAddress, c.RegistryAddress,
-		c.StakingTokenAddress, c.UtilityTokenAddress, c.ValidatorsAddress}
+		c.StakingTokenAddress, c.UtilityTokenAddress, c.ValidatorsAddress,
+	}
 
-	startingBlock := config.Configuration.Ethereum.StartingBlock
+	p, cf2, err := NewProcessor(d, c, "migrations.dat", big.NewInt(100000), big.NewInt(100000))
+	if err != nil {
+		logger.Error(err)
+		return 1
+	}
+	defer cf2()
+
+	eventMap := make(map[string]func(uint64, types.Log) error)
+	//eventMap["0x113b129fac2dde341b9fbbec2bb79a95b9945b0e80fda711fc8ae5c7b0ea83b0"] = validatorMemberReceived // (log types.Log), "ValidatorMember", svcs.ProcessValidatorMember); err != nil {
+	eventMap["0x5b063c6569a91e8133fc6cd71d31a4ca5c65c652fd53ae093f46107754f08541"] = p.Deposit         // depositReceived         // , "DepositReceived", svcs.ProcessDepositReceived); err != nil {
+	eventMap["0x1c85ff1efe0a905f8feca811e617102cb7ec896aded693eb96366c8ef22bb09f"] = p.ValidatorSet    // validatorSetReceived
+	eventMap["0x8c25e214c5693ebaf8008875bacedeb9e0aafd393864a314ed1801b2a4e13dd9"] = p.ValidatorJoined // validatorJoinedReceived
+	eventMap["0x6d438b6b835d16cdae6efdc0259fdfba17e6aa32dae81863a2467866f85f724a"] = p.Snapshot        // snapshotTaken
+
+	startingBlock := uint64(config.Configuration.Ethereum.StartingBlock)
+
 	endingBlock, err := eth.GetCurrentHeight(ctx)
 	if err != nil {
-		panic(err)
+		logger.Error(err)
+		return 1
 	}
 
-	logs, err := eth.GetEvents(ctx, uint64(startingBlock), endingBlock, contractAddresses)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, log := range logs {
-		eventSelector := log.Topics[0].String()
-
-		process, ok := eventMap[eventSelector]
-		if ok {
-			process(log)
-		} else {
-			logger.Infof("No handler for %v", eventSelector)
+	for i := startingBlock; i < endingBlock; i++ {
+		logs, err := eth.GetEvents(ctx, i, i+1, contractAddresses)
+		if err != nil {
+			logger.Error(err)
+			return 1
+		}
+		for _, log := range logs {
+			eventSelector := log.Topics[0].String()
+			process, ok := eventMap[eventSelector]
+			if ok {
+				if err := process(i, log); err != nil {
+					logger.Error(err)
+					return 1
+				}
+			} else {
+				logger.Infof("No handler for %v", eventSelector)
+			}
 		}
 	}
-
+	if err := p.Finalize(); err != nil {
+		logger.Error(err)
+		return 1
+	}
 	return 0
 }
 

@@ -2,6 +2,12 @@ logging = "utils=debug,register=debug,unregister=debug,ethereum=debug,main=warn"
 
 [chain]
 id = 42
+stateDB = "~/validator0/"
+stateDBInMemory = false
+transactionDB = ""
+transactionDBInMemory = true
+monitorDB = ""
+monitorDBInMemory = true
 
 [ethereum]
 defaultAccount = "0x546F99F244b7B58B855330AE0E2BC1b30b41302F"
@@ -15,7 +21,7 @@ testEther = "f000000000000000000"
 finalityDelay = 12
 retryCount = 30
 retryDelay = "5s"
-startingBlock = 100
+startingBlock = 1
 registryAddress = "0x0b1f9c2b7bed6db83295c7b5158e3806d67ec5bc"
 
 [utils]

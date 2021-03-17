@@ -153,7 +153,8 @@ func main() {
 		&utils.SendWeiCommand:        &utils.Command,
 		&utils.TransferTokensCommand: &utils.Command,
 		&utils.UnregisterCommand:     &utils.Command,
-		&utils.DepositCommand:        &utils.Command}
+		&utils.DepositCommand:        &utils.Command,
+		&utils.DumpMigrationsCommand: &utils.Command}
 
 	// Convert option abstraction into concrete settings for Cobra and Viper
 	for c := range options {
